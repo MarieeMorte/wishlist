@@ -23,6 +23,12 @@ class Priority(str, PyEnum):
     high = "high"
 
 
+class Marketplace(str, PyEnum):
+    wb = "wb"
+    ozon = "ozon"
+    yandex = "yandex"
+
+
 class Item(Base):
     __tablename__ = "items"
 
@@ -46,16 +52,19 @@ class Item(Base):
 
 class Offer(Base):
     __tablename__ = "offers"
-    __table_args__ = (UniqueConstraint("marketplace", "external_id"),)
+    __table_args__ = (UniqueConstraint("item_id", "url"),)
 
     id: Mapped[int] = mapped_column(BigInteger, primary_key=True)
     item_id: Mapped[int] = mapped_column(
         BigInteger, ForeignKey("items.id", ondelete="CASCADE"),
         nullable=False, index=True,
     )
-    marketplace: Mapped[str] = mapped_column(Text, default="wb", nullable=False)
+    marketplace: Mapped[Marketplace] = mapped_column(
+        SAEnum(Marketplace, name="marketplace_type"),
+        nullable=False,
+    )
     url: Mapped[str] = mapped_column(Text, nullable=False)
-    external_id: Mapped[str] = mapped_column(Text, nullable=False)
+    external_id: Mapped[str | None] = mapped_column(Text)
     last_price: Mapped[Decimal | None] = mapped_column(Numeric(12, 2))
     rating: Mapped[float | None] = mapped_column(Numeric(3, 2))
     feedbacks: Mapped[int | None]
