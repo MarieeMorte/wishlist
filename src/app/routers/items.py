@@ -4,7 +4,7 @@ from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 
 from app.db import get_db
-from app.models import Item, Marketplace, Offer, PriceHistory
+from app.models import Item, Offer, PriceHistory
 from app.schemas import ItemCreate, ItemPatch, OfferCreate, PriceUpdate
 
 router = APIRouter(prefix="/api")
@@ -20,15 +20,6 @@ PRICE_BUCKETS: list[tuple[Decimal | None, Decimal | None, str]] = [
     (Decimal("5000"), Decimal("8000"), "5000–8000 ₽"),
     (Decimal("8000"), Decimal("12000"), "8000–12000 ₽"),
     (Decimal("12000"), None, "более 12000 ₽"),
-]
-
-RATING_BUCKETS: list[tuple[float | None, float | None, str]] = [
-    (4.7, None, "4.7 и выше"),
-    (4.0, 4.7, "4.0–4.7"),
-    (3.0, 4.0, "3.0–4.0"),
-    (2.0, 3.0, "2.0–3.0"),
-    (1.0, 2.0, "1.0–2.0"),
-    (None, 1.0, "ниже 1.0"),
 ]
 
 
@@ -54,8 +45,6 @@ def _serialize(item: Item) -> dict:
                 "url": o.url,
                 "marketplace": o.marketplace.value,
                 "last_price": str(o.last_price) if o.last_price is not None else None,
-                "rating": float(o.rating) if o.rating is not None else None,
-                "feedbacks": o.feedbacks,
             }
             for o in item.offers
         ],
@@ -69,20 +58,6 @@ def _bucket_price(value: Decimal | None) -> tuple[str, int]:
         if (lo is None or value >= lo) and (hi is None or value < hi):
             return label, i
     return "без цены", 999
-
-
-def _bucket_rating(value: float | None) -> tuple[str, int]:
-    if value is None:
-        return "без рейтинга", 999
-    for i, (lo, hi, label) in enumerate(RATING_BUCKETS):
-        if (lo is None or value >= lo) and (hi is None or value < hi):
-            return label, i
-    return "без рейтинга", 999
-
-
-def _best_rating(item: dict) -> float:
-    values = [o["rating"] for o in item["offers"] if o["rating"]]
-    return max(values) if values else 0.0
 
 
 def _group(items: list[dict], group_by: str) -> list[dict]:
@@ -106,14 +81,6 @@ def _group(items: list[dict], group_by: str) -> list[dict]:
         ordered = sorted(buckets.items(), key=lambda kv: kv[1][0])
         return [{"key": k, "label": k, "items": v[1]} for k, v in ordered]
 
-    if group_by == "rating":
-        buckets: dict[str, tuple[int, list]] = {}
-        for it in items:
-            label, idx = _bucket_rating(_best_rating(it) or None)
-            buckets.setdefault(label, (idx, []))[1].append(it)
-        ordered = sorted(buckets.items(), key=lambda kv: kv[1][0])
-        return [{"key": k, "label": k, "items": v[1]} for k, v in ordered]
-
     # created
     buckets: dict[str, list] = {}
     for it in items:
@@ -129,8 +96,6 @@ def _group(items: list[dict], group_by: str) -> list[dict]:
 def _sort_key(sort: str):
     if sort == "price_desc":
         return lambda it: Decimal(it["min_price"]) if it["min_price"] else Decimal("1e12"), True
-    if sort == "rating_desc":
-        return lambda it: -_best_rating(it), False
     if sort == "priority":
         return lambda it: PRIORITY_ORDER.get(it["priority"], 99), False
     if sort == "created_desc":
@@ -156,7 +121,6 @@ def list_items(
         priority: str = "",
         price_min: Decimal | None = None,
         price_max: Decimal | None = None,
-        rating_min: float | None = None,
         target_hit: bool | None = None,
         q: str = "",
         db: Session = Depends(get_db),
@@ -178,8 +142,6 @@ def list_items(
             i for i in serialized
             if i["min_price"] is not None and Decimal(i["min_price"]) <= price_max
         ]
-    if rating_min is not None:
-        serialized = [i for i in serialized if _best_rating(i) >= rating_min]
     if target_hit is not None:
         serialized = [i for i in serialized if i["is_target_hit"] == target_hit]
     if q:

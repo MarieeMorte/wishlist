@@ -64,12 +64,7 @@ class Offer(Base):
         nullable=False,
     )
     url: Mapped[str] = mapped_column(Text, nullable=False)
-    external_id: Mapped[str | None] = mapped_column(Text)
     last_price: Mapped[Decimal | None] = mapped_column(Numeric(12, 2))
-    rating: Mapped[float | None] = mapped_column(Numeric(3, 2))
-    feedbacks: Mapped[int | None]
-    last_checked_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
-    last_error: Mapped[str | None] = mapped_column(Text)
 
     item: Mapped[Item] = relationship(back_populates="offers")
     history: Mapped[list["PriceHistory"]] = relationship(
