@@ -19,12 +19,5 @@ class ItemCreate(BaseModel):
     offers: list[OfferCreate] = []
 
 
-class ItemPatch(BaseModel):
-    title: str | None = None
-    note: str | None = None
-    priority: Priority | None = None
-    target_price: Decimal | None = None
-
-
 class PriceUpdate(BaseModel):
     price: Decimal

@@ -5,7 +5,7 @@ from sqlalchemy.orm import Session
 
 from app.db import get_db
 from app.models import Item, Offer, PriceHistory
-from app.schemas import ItemCreate, ItemPatch, OfferCreate, PriceUpdate
+from app.schemas import ItemCreate, OfferCreate, PriceUpdate
 
 router = APIRouter(prefix="/api")
 
@@ -189,63 +189,6 @@ def create_item(payload: ItemCreate, db: Session = Depends(get_db)):
     return _serialize(item)
 
 
-@router.get("/items/{item_id}")
-def get_item(item_id: int, db: Session = Depends(get_db)):
-    item = db.get(Item, item_id)
-    if not item:
-        raise HTTPException(404, "не найдено")
-    return _serialize(item)
-
-
-@router.patch("/items/{item_id}")
-def patch_item(item_id: int, payload: ItemPatch, db: Session = Depends(get_db)):
-    item = db.get(Item, item_id)
-    if not item:
-        raise HTTPException(404, "не найдено")
-    data = payload.model_dump(exclude_unset=True)
-    for k, v in data.items():
-        setattr(item, k, v)
-    db.commit()
-    db.refresh(item)
-    return _serialize(item)
-
-
-@router.delete("/items/{item_id}", status_code=204)
-def delete_item(item_id: int, db: Session = Depends(get_db)):
-    item = db.get(Item, item_id)
-    if not item:
-        raise HTTPException(404, "не найдено")
-    db.delete(item)
-    db.commit()
-
-
-@router.post("/items/{item_id}/offers")
-def add_offer(item_id: int, payload: OfferCreate, db: Session = Depends(get_db)):
-    item = db.get(Item, item_id)
-    if not item:
-        raise HTTPException(404, "товар не найден")
-    existing = (
-        db.query(Offer)
-        .filter_by(item_id=item_id, url=payload.url)
-        .first()
-    )
-    if existing:
-        raise HTTPException(409, "такая ссылка уже добавлена к этому товару")
-    offer = Offer(
-        item_id=item_id,
-        url=payload.url,
-        marketplace=payload.marketplace,
-        last_price=payload.price,
-    )
-    db.add(offer)
-    db.flush()
-    if payload.price is not None:
-        db.add(PriceHistory(offer_id=offer.id, price=payload.price))
-    db.commit()
-    db.refresh(item)
-    return _serialize(item)
-
-
 @router.patch("/offers/{offer_id}/price")
 def set_offer_price(offer_id: int, payload: PriceUpdate, db: Session = Depends(get_db)):
     offer = db.get(Offer, offer_id)
@@ -260,18 +203,3 @@ def set_offer_price(offer_id: int, payload: PriceUpdate, db: Session = Depends(g
         "last_price": str(offer.last_price),
         "item_id": offer.item_id,
     }
-
-
-@router.delete("/offers/{offer_id}", status_code=204)
-def delete_offer(offer_id: int, db: Session = Depends(get_db)):
-    offer = db.get(Offer, offer_id)
-    if not offer:
-        raise HTTPException(404, "оффер не найден")
-    db.delete(offer)
-    db.commit()
-
-
-@router.get("/summary")
-def get_summary(db: Session = Depends(get_db)):
-    items = [_serialize(i) for i in db.query(Item).all()]
-    return _summary(items)
