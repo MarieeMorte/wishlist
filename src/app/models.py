@@ -41,9 +41,6 @@ class Item(Base):
         nullable=False,
     )
     target_price: Mapped[Decimal | None] = mapped_column(Numeric(12, 2))
-    created_at: Mapped[datetime] = mapped_column(
-        DateTime(timezone=True), server_default=func.now(), nullable=False,
-    )
 
     offers: Mapped[list["Offer"]] = relationship(
         back_populates="item", cascade="all, delete-orphan",
@@ -60,8 +57,7 @@ class Offer(Base):
         nullable=False, index=True,
     )
     marketplace: Mapped[Marketplace] = mapped_column(
-        SAEnum(Marketplace, name="marketplace_type"),
-        nullable=False,
+        SAEnum(Marketplace, name="marketplace_type"), nullable=False,
     )
     url: Mapped[str] = mapped_column(Text, nullable=False)
     last_price: Mapped[Decimal | None] = mapped_column(Numeric(12, 2))

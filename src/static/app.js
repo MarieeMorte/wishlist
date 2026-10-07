@@ -69,7 +69,7 @@ function cardHtml(item) {
   const note = item.note ? ` · ${escapeHtml(item.note)}` : "";
 
   return `
-    <div class="card ${item.is_target_hit ? "hit" : ""}" data-item-id="${item.id}">
+    <div class="card ${item.is_target_hit ? "hit" : ""}">
       <div class="card-main">
         <h3>${escapeHtml(item.title)}</h3>
         <div class="meta">

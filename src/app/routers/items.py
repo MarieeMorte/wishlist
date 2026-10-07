@@ -5,7 +5,7 @@ from sqlalchemy.orm import Session
 
 from app.db import get_db
 from app.models import Item, Offer, PriceHistory
-from app.schemas import ItemCreate, OfferCreate, PriceUpdate
+from app.schemas import ItemCreate, PriceUpdate
 
 router = APIRouter(prefix="/api")
 
@@ -81,15 +81,14 @@ def _group(items: list[dict], group_by: str) -> list[dict]:
         ordered = sorted(buckets.items(), key=lambda kv: kv[1][0])
         return [{"key": k, "label": k, "items": v[1]} for k, v in ordered]
 
-    # created
+    # group_by == "target"
     buckets: dict[str, list] = {}
     for it in items:
         label = "Пора брать" if it["is_target_hit"] else "Ранее"
         buckets.setdefault(label, []).append(it)
-    preferred = ["Пора брать", "Ранее"]
     return [
         {"key": k, "label": k, "items": buckets[k]}
-        for k in preferred if k in buckets
+        for k in ["Пора брать", "Ранее"] if k in buckets
     ]
 
 
@@ -98,7 +97,7 @@ def _sort_key(sort: str):
         return lambda it: Decimal(it["min_price"]) if it["min_price"] else Decimal("1e12"), True
     if sort == "priority":
         return lambda it: PRIORITY_ORDER.get(it["priority"], 99), False
-    if sort == "created_desc":
+    if sort == "newest":
         return lambda it: -it["id"], False
     return lambda it: Decimal(it["min_price"]) if it["min_price"] else Decimal("1e12"), False
 
@@ -118,39 +117,10 @@ def _summary(items: list[dict]) -> dict:
 def list_items(
         group_by: str = "price",
         sort: str = "price_asc",
-        priority: str = "",
-        price_min: Decimal | None = None,
-        price_max: Decimal | None = None,
-        target_hit: bool | None = None,
-        q: str = "",
         db: Session = Depends(get_db),
 ):
     items = db.query(Item).all()
     serialized = [_serialize(i) for i in items]
-
-    if priority:
-        wanted = set(p.strip() for p in priority.split(","))
-        serialized = [i for i in serialized if i["priority"] in wanted]
-
-    if price_min is not None:
-        serialized = [
-            i for i in serialized
-            if i["min_price"] is not None and Decimal(i["min_price"]) >= price_min
-        ]
-    if price_max is not None:
-        serialized = [
-            i for i in serialized
-            if i["min_price"] is not None and Decimal(i["min_price"]) <= price_max
-        ]
-    if target_hit is not None:
-        serialized = [i for i in serialized if i["is_target_hit"] == target_hit]
-    if q:
-        needle = q.lower()
-        serialized = [
-            i for i in serialized
-            if needle in (i["title"] or "").lower()
-               or needle in (i["note"] or "").lower()
-        ]
 
     key, reverse = _sort_key(sort)
     serialized.sort(key=key, reverse=reverse)
